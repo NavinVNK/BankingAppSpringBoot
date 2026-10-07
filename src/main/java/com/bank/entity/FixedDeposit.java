@@ -1,15 +1,18 @@
 package com.bank.entity;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 
 @Entity
+@Schema(description = "Fixed Deposit entity details")
 @Table(name = "fixed_deposits")
 public class FixedDeposit {
 
     @Id
+    @Schema(description = "Unique Fixed Deposit Identifier", example = "FD-12A34B")
     private String depositId;
 
     // Many Fixed Deposits can belong to one BankAccount
@@ -18,11 +21,12 @@ public class FixedDeposit {
     private BankAccount account;
 
     @Column(nullable = false, precision = 15, scale = 2)
+    @Schema(description = "Principal amount deposited", example = "10000.00")
     private BigDecimal principalAmount;
-
+    @Schema(description = "Annual Interest Rate (%)", example = "6.5")
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal interestRate;
-
+    @Schema(description = "Duration in years", example = "3")
     @Column(nullable = false)
     private Integer durationYears;
 

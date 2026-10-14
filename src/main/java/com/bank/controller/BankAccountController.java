@@ -3,7 +3,9 @@ package com.bank.controller;
 import com.bank.dto.*;
 import com.bank.entity.BankAccount;
 import com.bank.entity.FixedDeposit;
+import com.bank.entity.LedgerEntry;
 import com.bank.service.BankAccountService;
+import org.springframework.data.domain.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -201,5 +203,14 @@ public class BankAccountController {
                 .map(FixedDepositResponse::fromEntity)
                 .toList();
         return ResponseEntity.ok(responses);
+    }
+    @GetMapping("/{id}/statement")
+    public ResponseEntity<Page<LedgerEntry>> getAccountStatement(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Page<LedgerEntry> statement = accountService.getAccountStatement(id, page, size);
+        return ResponseEntity.ok(statement);
     }
 }

@@ -15,6 +15,9 @@ public abstract class BankAccount {
     private Customer customer;
 
     private BigDecimal balance;
+    
+    @Version // Protects against concurrent balance mutations
+    private Long version;
 
     public BankAccount() {}
 

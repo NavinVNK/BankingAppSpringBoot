@@ -6,6 +6,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
@@ -54,6 +56,17 @@ public class GlobalExceptionHandler {
             errors.put(error.getField(), error.getDefaultMessage())
         );
         problem.setProperty("invalidFields", errors);
+        return problem;
+    }
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, 
+                "You do not have the required permissions to perform this banking operation."
+        );
+        problem.setTitle("Access Denied");
+        problem.setType(URI.create("https://bank.com/errors/access-denied"));
+        problem.setProperty("timestamp", Instant.now());
         return problem;
     }
 }

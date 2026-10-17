@@ -1,89 +1,99 @@
 package com.bank.config;
 
+import com.bank.security.CustomUserDetailsService;
+import com.bank.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final CustomUserDetailsService userDetailsService;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, CustomUserDetailsService userDetailsService) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.userDetailsService = userDetailsService;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // In-Memory User Details Service for Bank Personnel and Customers
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails clerk = User.builder()
-                .username("clerk1")
-                .password(passwordEncoder.encode("clerkPass123"))
-                .roles("CLERK")
-                .build();
+    public AuthenticationProvider authenticationProvider() {
+        // Pass userDetailsService via the constructor
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
 
-        UserDetails admin = User.builder()
-                .username("admin1")
-                .password(passwordEncoder.encode("adminPass123"))
-                .roles("ADMIN", "CLERK")
-                .build();
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
 
-        UserDetails customer = User.builder()
-                .username("customer1")
-                .password(passwordEncoder.encode("customerPass123"))
-                .roles("CUSTOMER")
-                .build();
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:4200"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowCredentials(true);
 
-        return new InMemoryUserDetailsManager(clerk, admin, customer);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. Disable CSRF for stateless REST APIs
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-
-            // 2. Set Stateless Session Management (Basic Auth standard)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-            // 3. Define URL-based Authorization Rules
+            .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
-                // Allow access to H2 Console if enabled
-                .requestMatchers("/h2-console/**").permitAll()
+                // Allow public access to Authentication and Swagger UI/OpenAPI endpoints
+                .requestMatchers(
+                    "/api/v1/auth/**",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html"
+                ).permitAll()
 
-                // Account Creation: CLERK and ADMIN only
+                // Operational rules
                 .requestMatchers(HttpMethod.POST, "/api/v1/accounts").hasAnyRole("CLERK", "ADMIN")
-
-                // Account Closure: ADMIN only
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/accounts/**").hasRole("ADMIN")
-
-                // Financial Operations (Credit/Debit/FD creation): CLERK and ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/v1/accounts/*/credit").hasAnyRole("CLERK", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/accounts/*/debit").hasAnyRole("CLERK", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/accounts/*/fixed-deposits").hasAnyRole("CLERK", "ADMIN")
-
-                // Read Operations (View account details & FDs): CLERK, ADMIN, and CUSTOMER
                 .requestMatchers(HttpMethod.GET, "/api/v1/accounts/**").hasAnyRole("CLERK", "ADMIN", "CUSTOMER")
 
-                // Any other request must be authenticated
                 .anyRequest().authenticated()
             )
-
-            // 4. Enable HTTP Basic Authentication
-            .httpBasic(Customizer.withDefaults());
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

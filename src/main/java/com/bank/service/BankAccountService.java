@@ -18,6 +18,7 @@ import com.bank.exception.ResourceNotFoundException;
 import com.bank.repository.LedgerRepository;
 import com.bank.repository.BankAccountRepository;
 import com.bank.repository.FixedDepositRepository;
+import com.bank.annotation.AuditLog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,7 @@ public class BankAccountService {
         this.fdRepository = fdRepository;
         this.ledgerRepository = ledgerRepository;
     }
-
+    @AuditLog(action = "ACCOUNT_CREATION")
     public BankAccount createAccount(CreateAccountRequest req) {
         if (accountRepository.count() >= MAX_ACCOUNTS) {
             throw new MaxAccountLimitReachedException("Bank capacity reached. At most " + MAX_ACCOUNTS + " accounts can be created.");
@@ -78,9 +79,9 @@ public class BankAccountService {
         return accountRepository.findById(accountId)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", "id", accountId));
     }
-
+    @AuditLog(action = "CREDIT_OPERATION")
     // Direct operation accepting DTO
-    public BankAccount credit(String accountId, AccountOperationRequest request) {
+        public BankAccount credit(String accountId, AccountOperationRequest request) {
         return credit(accountId, request.amount());
     }
 
@@ -105,6 +106,7 @@ public class BankAccountService {
     }
 
     // Direct operation accepting DTO
+     @AuditLog(action = "DEBIT_OPERATION")
     public BankAccount debit(String accountId, AccountOperationRequest request) {
         return debit(accountId, request.amount());
     }
@@ -127,7 +129,7 @@ public class BankAccountService {
         ledgerRepository.save(entry);
         return accountRepository.save(account);
     }
-
+    @AuditLog(action = "ACCOUNT_CLOSURE")
     public BigDecimal closeAccount(String accountId) {
         BankAccount account = getAccount(accountId);
         BigDecimal finalBalance = account.getBalance();

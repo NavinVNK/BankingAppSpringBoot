@@ -7,12 +7,11 @@ spring:
     username: root
     password: ""
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
 
   jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
     hibernate:
-      ddl-auto: update # Automatically creates/updates tables (use 'validate' or Flyway/Liquibase in production)
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -21,4 +20,8 @@ spring:
     error:
       include-message: always
 
-# Enable RFC 7807 support for exception handling
+logging:
+  level:
+    root: INFO
+    com.bank: DEBUG
+    org.springframework.aop: DEBUG
